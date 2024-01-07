@@ -29,6 +29,7 @@ contract NFTMarketplace {
         address contractAddr;
         string name;
         string symbol;
+        uint256 royalties;
         string[] tokenUris;
         uint256[] tokenId;
     }

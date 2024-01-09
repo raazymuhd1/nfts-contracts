@@ -129,6 +129,19 @@ contract NFT is ERC721 {
         return success;
     }
 
+
+    /**
+     * @dev transfer NFT { "from" to "to" }
+     */
+    function transferNft(uint256 tokenId, address to_) external NotZeroAddress returns(bool success) {
+        if(balanceOf(msg.sender) <= 0) {
+            revert NFT_BalanceIsZero();
+        }
+        _safeTransfer(msg.sender, to_, tokenId);
+        success = true;
+    }
+
+
     function tokenURI(uint256 tokenId_) public view override returns(string memory uri) {
          string memory baseUri = _baseURI();
          uri = string.concat(baseUri, s_tokenUri[tokenId_]);
@@ -136,6 +149,10 @@ contract NFT is ERC721 {
 
     function getTokenCounter() public view returns(uint256 tokenCounter) {
         tokenCounter = s_tokenCounter;
+    }
+
+    function getBaseURI() external pure returns(string memory baseUri) {
+        baseUri = _baseURI();
     }
 
 }

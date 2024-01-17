@@ -170,7 +170,7 @@ contract NFTTest is Test {
         assert(keccak256(abi.encodePacked(expectedBaseUri)) == keccak256(abi.encodePacked(actualBaseUri)));
     }
 
-    function test_transferNft() public payable {
+    function test_transferNft() public payable Whitelisted {
         address to_ = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
 
         vm.startPrank(USER);

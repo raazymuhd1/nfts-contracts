@@ -24,7 +24,9 @@ pragma solidity ^0.8.18;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
-
+import { UUPSUpgradeable } from "@openzeppelin/upgradeable-contracts/proxy/utils/UUPSUpgradeable.sol";
+import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import { OwnableUpgradeable } from "@openzeppelin/upgradeable-contracts/access/OwnableUpgradeable.sol";
 
 /**
  * @author Mohammed Raazy
@@ -37,23 +39,28 @@ contract NFT is ERC721 {
     ////////////////////// ERRORS //////////////////////////
     error NFT_AddressIsZero();
     error NFT_BalanceIsZero();
-    error NFT_CanOnlyMintOnce();
+    error NFT_CanOnlyMintTwice();
     error NFT_MintFeeNeeded();
     error NFT_NotOwner();
     error NFT_FeeBalanceIsZero();
     error NFT_WithdrawFailed();
+    error NFT_NotWhitelisted();
+    error NFT_AlreadyWhitelisted();
 
     NftDetails private s_nft;
 
     uint256 private constant MINT_FEE = 0.001 ether;
+    address[] private s_whitelists;
     uint256 private s_tokenCounter = 0;
     address private s_owner;
 
     mapping(uint256 tokenId => string tokenUri) private s_tokenUri;
+    mapping(address user => bool whitelisted) private s_isWhitelisted;
 
     ///////////////// EVENTS ///////////////////
     event NFTMinted(string indexed tokenUri, address indexed minter);
     event WithdrawSuccess(address indexed owner, uint256 amount);
+    event Whitelisted(address[] indexed whitelisters);
 
     struct NftDetails {
         string tokenUri;
@@ -84,9 +91,27 @@ contract NFT is ERC721 {
         _;
     }
 
-    constructor(string memory nftName, string memory nftSymbol) ERC721(nftName, nftSymbol) {
-        s_owner = msg.sender;
+    modifier IsWhitelisted {
+        if(!s_isWhitelisted[msg.sender]) {
+            revert NFT_NotWhitelisted();
+        }
+
+        _;
     }
+
+    constructor(string memory nftName,
+    string memory nftSymbol, address owner_) ERC721(nftName, nftSymbol) {
+        // _disableInitializers(); // this line tells to disable constructor from initialize any state variables
+        s_owner = owner_;
+    }
+
+    // function initialize(string memory nftName, string memory nftSymbol) public initializer {
+    //     __Ownable_init(msg.sender);
+    //     __UUPSUpgradeable_init();
+
+    //     s_nftName = nftName;
+    //     s_nftSymbol = nftSymbol;
+    // }
 
     receive() external payable {
         mintNFT(string.concat(_baseURI(), "QmSxqYRqvG5eSTZsKytVDx2JCQs1P3Tb2hBjPNDLkGv8rB/metadata1.json"));
@@ -96,11 +121,35 @@ contract NFT is ERC721 {
      function _baseURI() internal pure override returns(string memory baseUri) {
          baseUri = "https://ipfs.io/ipfs/";
     }
+
+    function _addWhitelist(address[] memory whitelists) internal OnlyOwner {
+         address[] memory whitelisters = new address[](whitelists.length);
+
+         for(uint i = 0; i < whitelisters.length; i++) {
+            s_whitelists.push(whitelists[i]);
+             if(s_isWhitelisted[whitelists[i]] == true) {
+                revert NFT_AlreadyWhitelisted();
+             }
+              s_isWhitelisted[whitelists[i]] = true;
+         }
+
+        emit Whitelisted(whitelists);
+    }
     
     ///////////////// Public & External Functions ////////////////////
-    function mintNFT(string memory tokenUri) public payable NotZeroAddress BalanceMoreThanZero {
+
+    function addWhitelist(address[] memory whitelists) external OnlyOwner returns(bool) {
+        _addWhitelist(whitelists);
+        return true;
+    }
+
+    // function transferOwnership() external returns(address) {
+
+    // }
+
+    function mintNFT(string memory tokenUri) public payable NotZeroAddress BalanceMoreThanZero IsWhitelisted {
         if(balanceOf(msg.sender) >= 2) {
-            revert NFT_CanOnlyMintOnce();
+            revert NFT_CanOnlyMintTwice();
         }
 
         if(msg.value <= 0 || msg.value < MINT_FEE) {
@@ -113,13 +162,13 @@ contract NFT is ERC721 {
         s_tokenCounter += 1;
     }
 
-    function withdrawMintFee() external payable OnlyOwner NotZeroAddress returns(bool) {
+    function withdrawMintFee(uint256 wdAmount) external payable OnlyOwner NotZeroAddress returns(bool) {
         address owner = s_owner;
-
+        
         if(address(this).balance <= 0) {
             revert NFT_FeeBalanceIsZero();
         }
-        (bool success,) = s_owner.call{value: address(this).balance}("");
+        (bool success,) = payable(owner).call{value: wdAmount}("");
 
         if(!success) {
             revert NFT_WithdrawFailed();
@@ -153,6 +202,20 @@ contract NFT is ERC721 {
 
     function getBaseURI() external pure returns(string memory baseUri) {
         baseUri = _baseURI();
+    }
+
+    function getWhitelistedWallet() public view returns(address[] memory whitelisted) {
+        whitelisted = s_whitelists;
+    } 
+
+    function checkIsWhitelisted(address user) public view returns(bool) {
+        bool whitelisted = s_isWhitelisted[user];
+
+        if(whitelisted == true) {
+            return true;
+        }
+
+        return false;
     }
 
 }

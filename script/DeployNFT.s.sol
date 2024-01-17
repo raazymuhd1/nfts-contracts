@@ -6,9 +6,19 @@ import { NFT } from "../src/NFT.sol";
 
 contract DeployNFT is Script {
 
-    function run() public returns(NFT) {
+    address INITIAL_OWNER = 0x34699bE6B2a22E79209b8e9f9517C5e18db7eB89;
+    NFT nft;
+
+
+    function run(address initial_owner) public returns(NFT) {
          vm.startBroadcast();
-         NFT nft = new NFT("Bull", "Bull");
+
+         if(initial_owner != address(0)) {
+            nft = new NFT("Bull", "Bull", initial_owner);
+         } else {
+            nft = new NFT("Bull", "Bull", INITIAL_OWNER);
+         } 
+
          console.log(address(nft));
 
          vm.stopBroadcast();
